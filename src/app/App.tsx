@@ -17,10 +17,10 @@ export default function App() {
           </span>
           <nav className="flex gap-2">
             <NavLink to="/equipment-anomalies" className={navLinkClass}>
-              장비이상목록(가제)
+              장비이상 모니터링(가제)
             </NavLink>
-            <NavLink to="/screen-2" className={navLinkClass}>
-              Screen2
+            <NavLink to="/equipment-standard-settings" className={navLinkClass}>
+              장비이상 기준설정
             </NavLink>
             <NavLink to="/screen-3" className={navLinkClass}>
               Screen3

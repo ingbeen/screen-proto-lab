@@ -1,10 +1,10 @@
 /**
- * EquipmentAnomalies (장비이상목록)
+ * EquipmentAnomalies (장비이상 모니터링)
  *
  * 장비별 이상 감지 내역을 확인하고 상태를 직접 관리할 수 있는 화면
  *
  * 주요 기능:
- * - 장비 이상 목록 조회 및 검색
+ * - 장비이상 목록 조회 및 검색
  * - 이상 상태 확인 처리 (미확인 → 확인완료)
  * - 정렬 및 필터링
  */
@@ -220,9 +220,9 @@ export default function EquipmentAnomalies() {
         <div className="max-w-[1600px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-gray-900">장비이상목록(가제)</h1>
+              <h1 className="text-gray-900">장비이상 모니터링(가제)</h1>
               <p className="text-gray-500 mt-1">
-                장비이상목록 이상 감지 내역을 확인하고 관리할 수 있는 화면
+                장비이상 모니터링 이상 감지 내역을 확인하고 관리할 수 있는 화면
               </p>
             </div>
           </div>

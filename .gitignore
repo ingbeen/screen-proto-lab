@@ -1,1 +1,23 @@
+# Dependencies
+node_modules/
 node_modules
+
+# Vite
+.vite/
+
+# Build outputs
+dist/
+dist-ssr/
+
+# Editor directories
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="Help">
+  <!-- Transparent background -->
+  <circle cx="12" cy="12" r="11" fill="#E9ECEF"></circle>
+  <circle cx="12" cy="12" r="11" fill="none" stroke="#CED4DA" stroke-width="1"></circle>
+
+  <!-- Question mark (more natural) -->
+  <path d="M12 15.0v-1.1c0-1.2.7-1.8 1.6-2.3.9-.5 1.7-1 1.7-2.1
+           0-1.6-1.3-2.7-3.3-2.7-1.6 0-2.8.7-3.6 2.0" fill="none" stroke="#495057" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+  <circle cx="12" cy="17.5" r="0.95" fill="#495057"></circle>
+</svg>

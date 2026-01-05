@@ -41,6 +41,11 @@ import {
   TableHeader,
   TableRow,
 } from "../app/components/ui/table";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "../app/components/ui/tooltip";
 
 export interface EquipmentStandard {
   id: string;
@@ -123,12 +128,9 @@ interface StandardRange {
   gpsSensitivityMax: string;
   batteryVoltageMin: string;
   batteryVoltageMax: string;
-  waterTempMin: string;
-  waterTempMax: string;
-  doMin: string;
-  doMax: string;
-  dailyMeasurementCountMin: string;
-  dailyMeasurementCountMax: string;
+  waterTempVariance: string; // 수온 편차 범위 (단일 값)
+  doVariance: string; // DO 편차 범위 (단일 값)
+  unmeasuredThreshold: string; // 미측정 구간 (단일 값)
 }
 
 export default function EquipmentStandardSettings() {
@@ -151,12 +153,9 @@ export default function EquipmentStandardSettings() {
     gpsSensitivityMax: "",
     batteryVoltageMin: "",
     batteryVoltageMax: "",
-    waterTempMin: "",
-    waterTempMax: "",
-    doMin: "",
-    doMax: "",
-    dailyMeasurementCountMin: "",
-    dailyMeasurementCountMax: "",
+    waterTempVariance: "",
+    doVariance: "",
+    unmeasuredThreshold: "",
   });
 
   const handleSort = (field: keyof EquipmentStandard) => {
@@ -243,12 +242,9 @@ export default function EquipmentStandardSettings() {
       gpsSensitivityMax: "15",
       batteryVoltageMin: "11.0",
       batteryVoltageMax: "13.0",
-      waterTempMin: "0",
-      waterTempMax: "30",
-      doMin: "5",
-      doMax: "12",
-      dailyMeasurementCountMin: "24",
-      dailyMeasurementCountMax: "24",
+      waterTempVariance: "5",
+      doVariance: "2",
+      unmeasuredThreshold: "3",
     });
     setDialogOpen(true);
   };
@@ -267,12 +263,9 @@ export default function EquipmentStandardSettings() {
       gpsSensitivityMax: "15",
       batteryVoltageMin: "11.0",
       batteryVoltageMax: "13.0",
-      waterTempMin: "0",
-      waterTempMax: "30",
-      doMin: "5",
-      doMax: "12",
-      dailyMeasurementCountMin: "24",
-      dailyMeasurementCountMax: "24",
+      waterTempVariance: "5",
+      doVariance: "2",
+      unmeasuredThreshold: "3",
     });
     setDialogOpen(true);
   };
@@ -570,9 +563,10 @@ export default function EquipmentStandardSettings() {
             </div>
             {/* GPS 감도 */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="gps-min" className="text-right col-span-1">
-                GPS 감도
-              </Label>
+              <div className="text-right col-span-1 flex items-center justify-end">
+                <Label htmlFor="gps-min">GPS 감도</Label>
+                <HelpIcon tooltip="GPS 신호 감도 범위를 설정합니다. 설명이 여기에 표시됩니다." />
+              </div>
               <div className="col-span-3 flex items-center gap-2">
                 <Input
                   id="gps-min"
@@ -606,9 +600,10 @@ export default function EquipmentStandardSettings() {
 
             {/* 배터리 전압 */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="battery-min" className="text-right col-span-1">
-                배터리 전압
-              </Label>
+              <div className="text-right col-span-1 flex items-center justify-end">
+                <Label htmlFor="battery-min">배터리 전압</Label>
+                <HelpIcon tooltip="배터리 전압 정상 범위를 설정합니다. 설명이 여기에 표시됩니다." />
+              </div>
               <div className="col-span-3 flex items-center gap-2">
                 <Input
                   id="battery-min"
@@ -640,35 +635,22 @@ export default function EquipmentStandardSettings() {
               </div>
             </div>
 
-            {/* 수온 */}
+            {/* 수온 편차 범위 */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="temp-min" className="text-right col-span-1">
-                수온
-              </Label>
+              <div className="text-right col-span-1 flex items-center justify-end">
+                <Label htmlFor="water-temp-variance">수온</Label>
+                <HelpIcon tooltip="알고리즘 계산 결과값 ± 입력값 범위로 체크합니다. 예: 5 입력 시 계산값이 10이면 5~15 범위 체크" />
+              </div>
               <div className="col-span-3 flex items-center gap-2">
                 <Input
-                  id="temp-min"
+                  id="water-temp-variance"
                   type="number"
-                  placeholder="최소값"
-                  value={standardRange.waterTempMin}
+                  placeholder="편차 범위 (예: 5)"
+                  value={standardRange.waterTempVariance}
                   onChange={(e) =>
                     setStandardRange({
                       ...standardRange,
-                      waterTempMin: e.target.value,
-                    })
-                  }
-                  className="flex-1"
-                />
-                <span className="text-gray-500">~</span>
-                <Input
-                  id="temp-max"
-                  type="number"
-                  placeholder="최대값"
-                  value={standardRange.waterTempMax}
-                  onChange={(e) =>
-                    setStandardRange({
-                      ...standardRange,
-                      waterTempMax: e.target.value,
+                      waterTempVariance: e.target.value,
                     })
                   }
                   className="flex-1"
@@ -676,35 +658,22 @@ export default function EquipmentStandardSettings() {
               </div>
             </div>
 
-            {/* DO */}
+            {/* DO 편차 범위 */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="do-min" className="text-right col-span-1">
-                DO
-              </Label>
+              <div className="text-right col-span-1 flex items-center justify-end">
+                <Label htmlFor="do-variance">DO</Label>
+                <HelpIcon tooltip="DO 알고리즘 계산 결과값 ± 입력값 범위로 체크합니다. 설명이 여기에 표시됩니다." />
+              </div>
               <div className="col-span-3 flex items-center gap-2">
                 <Input
-                  id="do-min"
+                  id="do-variance"
                   type="number"
-                  placeholder="최소값"
-                  value={standardRange.doMin}
+                  placeholder="편차 범위 (예: 2)"
+                  value={standardRange.doVariance}
                   onChange={(e) =>
                     setStandardRange({
                       ...standardRange,
-                      doMin: e.target.value,
-                    })
-                  }
-                  className="flex-1"
-                />
-                <span className="text-gray-500">~</span>
-                <Input
-                  id="do-max"
-                  type="number"
-                  placeholder="최대값"
-                  value={standardRange.doMax}
-                  onChange={(e) =>
-                    setStandardRange({
-                      ...standardRange,
-                      doMax: e.target.value,
+                      doVariance: e.target.value,
                     })
                   }
                   className="flex-1"
@@ -712,38 +681,24 @@ export default function EquipmentStandardSettings() {
               </div>
             </div>
 
-            {/* 일별 데이터 측정 횟수 */}
+            {/* 미측정 구간 */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="count-min" className="text-right col-span-1">
-                일별 측정 횟수
-              </Label>
-              <div className="col-span-3 flex items-center gap-2">
+              <div className="text-right col-span-1 flex items-center justify-end">
+                <Label htmlFor="unmeasured-threshold">미측정 구간</Label>
+                <HelpIcon tooltip="연속 미측정 허용 횟수를 설정합니다. 설명이 여기에 표시됩니다." />
+              </div>
+              <div className="col-span-3">
                 <Input
-                  id="count-min"
+                  id="unmeasured-threshold"
                   type="number"
-                  placeholder="최소값"
-                  value={standardRange.dailyMeasurementCountMin}
+                  placeholder="연속 미측정 허용 횟수"
+                  value={standardRange.unmeasuredThreshold}
                   onChange={(e) =>
                     setStandardRange({
                       ...standardRange,
-                      dailyMeasurementCountMin: e.target.value,
+                      unmeasuredThreshold: e.target.value,
                     })
                   }
-                  className="flex-1"
-                />
-                <span className="text-gray-500">~</span>
-                <Input
-                  id="count-max"
-                  type="number"
-                  placeholder="최대값"
-                  value={standardRange.dailyMeasurementCountMax}
-                  onChange={(e) =>
-                    setStandardRange({
-                      ...standardRange,
-                      dailyMeasurementCountMax: e.target.value,
-                    })
-                  }
-                  className="flex-1"
                 />
               </div>
             </div>
@@ -758,5 +713,35 @@ export default function EquipmentStandardSettings() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/**
+ * 도움말 아이콘 컴포넌트
+ */
+interface HelpIconProps {
+  tooltip: string;
+}
+
+function HelpIcon({ tooltip }: HelpIconProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center justify-center ml-2 cursor-help"
+          onClick={(e) => e.preventDefault()}
+        >
+          <img
+            src="/images/help-question.svg"
+            alt="도움말"
+            className="w-5 h-5"
+          />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="max-w-xs">
+        <p className="text-xs">{tooltip}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }

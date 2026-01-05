@@ -105,22 +105,26 @@ const formatDateTime = (date: Date): string => {
   return date.toISOString().slice(0, 16).replace("T", " ");
 };
 
-const getAlgorithmRange = (itemName: string, baseValue: number) => {
-  const ranges: Record<string, { min: number; max: number }> = {
-    수온: { min: baseValue - 5, max: baseValue + 5 },
-    DO: { min: baseValue - 2, max: baseValue + 2 },
-    염분: { min: baseValue - 3, max: baseValue + 3 },
+const getAlgorithmRange = (itemName: string) => {
+  // Fixed baseline ranges (independent of measurementValue)
+  const baselineRanges: Record<string, { min: number; max: number }> = {
+    수온: { min: 14, max: 22 },
+    DO: { min: 5, max: 9 },
+    염분: { min: 28, max: 34 },
   };
-  return ranges[itemName] || { min: baseValue - 1, max: baseValue + 1 };
+
+  return baselineRanges[itemName] || { min: 0, max: 100 };
 };
 
 const generateAnomalyData = (equipment: Equipment): TimeSeriesData[] => {
   const occurredTime = new Date(equipment.occurredAt);
   const data: TimeSeriesData[] = [];
-  const range = getAlgorithmRange(
-    equipment.issueItem,
-    equipment.measurementValue
-  );
+  const range = getAlgorithmRange(equipment.issueItem);
+  const { measurementValue } = equipment;
+
+  // Determine anomaly direction based on measurementValue
+  const isAboveMax = measurementValue > range.max;
+  const isBelowMin = measurementValue < range.min;
 
   // 1시간 간격으로 24시간 데이터 생성 (±12시간)
   for (let i = -12; i <= 12; i++) {
@@ -129,16 +133,22 @@ const generateAnomalyData = (equipment: Equipment): TimeSeriesData[] => {
 
     let value: number;
 
-    // 발생 시점 근처(-2 ~ +2시간)에는 범위를 벗어난 값 생성
-    if (i >= -2 && i <= 2) {
-      // 최소값 아래 또는 최대값 위로 벗어나게 함
-      const exceedDirection = Math.random() > 0.5 ? 1 : -1;
-      if (exceedDirection > 0) {
-        // 최대값을 초과
+    // 발생 시점 근처(-1 ~ +1시간)에는 범위를 벗어난 값 생성 (3개 포인트)
+    const isAnomalyPeriod = i >= -1 && i <= 1;
+
+    // 3개 포인트 중 약 2개만 이상치로 표시 (66% 확률)
+    const shouldBeAnomalous = isAnomalyPeriod && Math.random() > 0.33;
+
+    if (shouldBeAnomalous) {
+      if (isAboveMax) {
+        // 최대값 위로만 벗어남
         value = range.max + 1 + Math.random() * 2;
-      } else {
-        // 최소값 미만
+      } else if (isBelowMin) {
+        // 최소값 아래로만 벗어남
         value = range.min - 1 - Math.random() * 2;
+      } else {
+        // measurementValue가 정상 범위 내인 경우 (일반적이지 않음)
+        value = range.min + Math.random() * (range.max - range.min);
       }
     } else {
       // 정상 범위 내의 값
@@ -175,6 +185,28 @@ const generateRecentData = (): MultiSeriesData[] => {
   }
 
   return data;
+};
+
+const calculateYAxisDomain = (
+  itemName: string,
+  measurementValue: number
+): [number, number] => {
+  const range = getAlgorithmRange(itemName);
+
+  // Determine if anomaly is above or below
+  const isAboveMax = measurementValue > range.max;
+  const isBelowMin = measurementValue < range.min;
+
+  if (isAboveMax) {
+    // Show from (min - 2) to (measurementValue + 3)
+    return [range.min - 2, measurementValue + 3];
+  } else if (isBelowMin) {
+    // Show from (measurementValue - 3) to (max + 2)
+    return [measurementValue - 3, range.max + 2];
+  } else {
+    // Default: show full range with padding
+    return [range.min - 2, range.max + 2];
+  }
 };
 
 const mockEquipmentData: Equipment[] = [
@@ -316,10 +348,7 @@ export default function EquipmentAnomalies() {
     const { cx, cy, payload } = props;
     if (!selectedEquipment) return <Dot {...props} />;
 
-    const range = getAlgorithmRange(
-      selectedEquipment.issueItem,
-      selectedEquipment.measurementValue
-    );
+    const range = getAlgorithmRange(selectedEquipment.issueItem);
 
     // 범위를 벗어난 점인지 확인
     const isOutOfRange = payload.value < range.min || payload.value > range.max;
@@ -618,7 +647,7 @@ export default function EquipmentAnomalies() {
                             variant="outline"
                             size="sm"
                             onClick={() => console.log("새창 열기:", item.id)}
-                            className="border-gray-300 text-red-500 hover:bg-gray-100 text-xs"
+                            className="border-gray-300 text-gray-700 hover:bg-gray-100 text-xs"
                           >
                             열기
                           </Button>
@@ -718,32 +747,16 @@ export default function EquipmentAnomalies() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="time" />
                       <YAxis
-                        domain={[
-                          getAlgorithmRange(
-                            selectedEquipment.issueItem,
-                            selectedEquipment.measurementValue
-                          ).min - 2,
-                          getAlgorithmRange(
-                            selectedEquipment.issueItem,
-                            selectedEquipment.measurementValue
-                          ).max + 2,
-                        ]}
+                        domain={calculateYAxisDomain(
+                          selectedEquipment.issueItem,
+                          selectedEquipment.measurementValue
+                        )}
                       />
 
                       {/* 정상 범위 배경색 (최소~최대) */}
                       <ReferenceArea
-                        y1={
-                          getAlgorithmRange(
-                            selectedEquipment.issueItem,
-                            selectedEquipment.measurementValue
-                          ).min
-                        }
-                        y2={
-                          getAlgorithmRange(
-                            selectedEquipment.issueItem,
-                            selectedEquipment.measurementValue
-                          ).max
-                        }
+                        y1={getAlgorithmRange(selectedEquipment.issueItem).min}
+                        y2={getAlgorithmRange(selectedEquipment.issueItem).max}
                         fill="#22c55e"
                         fillOpacity={0.1}
                         stroke="none"
@@ -751,12 +764,7 @@ export default function EquipmentAnomalies() {
 
                       {/* 알고리즘 최소선 */}
                       <ReferenceLine
-                        y={
-                          getAlgorithmRange(
-                            selectedEquipment.issueItem,
-                            selectedEquipment.measurementValue
-                          ).min
-                        }
+                        y={getAlgorithmRange(selectedEquipment.issueItem).min}
                         stroke="#dc2626"
                         strokeDasharray="3 3"
                         label="최소"
@@ -764,12 +772,7 @@ export default function EquipmentAnomalies() {
 
                       {/* 알고리즘 최대선 */}
                       <ReferenceLine
-                        y={
-                          getAlgorithmRange(
-                            selectedEquipment.issueItem,
-                            selectedEquipment.measurementValue
-                          ).max
-                        }
+                        y={getAlgorithmRange(selectedEquipment.issueItem).max}
                         stroke="#dc2626"
                         strokeDasharray="3 3"
                         label="최대"

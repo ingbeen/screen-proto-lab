@@ -220,7 +220,7 @@ export default function EquipmentAnomalies() {
         <div className="max-w-[1600px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-gray-900">장비이상 모니터링(가제)</h1>
+              <h1 className="text-gray-900">장비이상 모니터링</h1>
               <p className="text-gray-500 mt-1">
                 장비이상 모니터링 이상 감지 내역을 확인하고 관리할 수 있는 화면
               </p>

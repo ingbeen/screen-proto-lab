@@ -433,16 +433,9 @@ export default function EquipmentStandardSettings() {
                     </TableRow>
                   ) : (
                     filteredAndSortedData.map((item) => (
-                      <TableRow
-                        key={item.id}
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleRowClick(item)}
-                      >
+                      <TableRow key={item.id} className="hover:bg-gray-50">
                         <TableCell className="text-center">
-                          <div
-                            className="flex justify-center"
-                            onClick={(e) => e.stopPropagation()}
-                          >
+                          <div className="flex justify-center">
                             <Checkbox
                               checked={selectedIds.includes(item.id)}
                               onCheckedChange={(checked) =>
@@ -455,7 +448,12 @@ export default function EquipmentStandardSettings() {
                           {item.projectName}
                         </TableCell>
                         <TableCell className="text-center">
-                          {item.equipmentSN}
+                          <span
+                            className="underline cursor-pointer hover:text-blue-600"
+                            onClick={() => handleRowClick(item)}
+                          >
+                            {item.equipmentSN}
+                          </span>
                         </TableCell>
                         <TableCell className="text-center">
                           {item.pointName}
@@ -548,9 +546,8 @@ export default function EquipmentStandardSettings() {
                 : `일괄 기준 범위 설정 (${selectedIds.length}개 항목)`}
             </DialogTitle>
             <DialogDescription>
-              {dialogMode === "single"
-                ? "해당 정점의 이상 감지 기준 범위를 설정합니다."
-                : "선택한 정점들에 동일한 기준 범위를 적용합니다."}
+              각 항목의 정상 범위를 설정하며, 기준을 초과하거나 미달할 경우 이상
+              장비로 판별됩니다.
             </DialogDescription>
           </DialogHeader>
 

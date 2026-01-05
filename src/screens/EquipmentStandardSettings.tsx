@@ -130,6 +130,7 @@ interface StandardRange {
   batteryVoltageMax: string;
   waterTempVariance: string; // 수온 편차 범위 (단일 값)
   doVariance: string; // DO 편차 범위 (단일 값)
+  salinityVariance: string; // 염분 편차 범위 (단일 값)
   unmeasuredThreshold: string; // 미측정 구간 (단일 값)
 }
 
@@ -155,6 +156,7 @@ export default function EquipmentStandardSettings() {
     batteryVoltageMax: "",
     waterTempVariance: "",
     doVariance: "",
+    salinityVariance: "",
     unmeasuredThreshold: "",
   });
 
@@ -244,6 +246,7 @@ export default function EquipmentStandardSettings() {
       batteryVoltageMax: "13.0",
       waterTempVariance: "5",
       doVariance: "2",
+      salinityVariance: "3",
       unmeasuredThreshold: "3",
     });
     setDialogOpen(true);
@@ -265,6 +268,7 @@ export default function EquipmentStandardSettings() {
       batteryVoltageMax: "13.0",
       waterTempVariance: "5",
       doVariance: "2",
+      salinityVariance: "3",
       unmeasuredThreshold: "3",
     });
     setDialogOpen(true);
@@ -674,6 +678,29 @@ export default function EquipmentStandardSettings() {
                     setStandardRange({
                       ...standardRange,
                       doVariance: e.target.value,
+                    })
+                  }
+                  className="flex-1"
+                />
+              </div>
+            </div>
+
+            {/* 염분 편차 범위 */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <div className="text-right col-span-1 flex items-center justify-end">
+                <Label htmlFor="salinity-variance">염분</Label>
+                <HelpIcon tooltip="염분 알고리즘 계산 결과값 ± 입력값 범위로 체크합니다. 설명이 여기에 표시됩니다." />
+              </div>
+              <div className="col-span-3 flex items-center gap-2">
+                <Input
+                  id="salinity-variance"
+                  type="number"
+                  placeholder="편차 범위 (예: 3)"
+                  value={standardRange.salinityVariance}
+                  onChange={(e) =>
+                    setStandardRange({
+                      ...standardRange,
+                      salinityVariance: e.target.value,
                     })
                   }
                   className="flex-1"

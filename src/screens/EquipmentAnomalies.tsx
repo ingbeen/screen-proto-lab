@@ -30,6 +30,32 @@ import {
   TableHeader,
   TableRow,
 } from "../app/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../app/components/ui/dialog";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  ChartConfig,
+} from "../app/components/ui/chart";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ReferenceLine,
+  ReferenceArea,
+  Dot,
+} from "recharts";
 
 export interface Equipment {
   id: string;
@@ -46,6 +72,111 @@ export interface Equipment {
   occurredAt: string;
 }
 
+interface TimeSeriesData {
+  time: string;
+  value: number;
+}
+
+interface MultiSeriesData {
+  time: string;
+  waterTemp: number;
+  do: number;
+  salinity: number;
+}
+
+// 유틸리티 함수들
+const CHARTABLE_ITEMS = ["수온", "DO", "염분"];
+const isChartableItem = (itemName: string) =>
+  CHARTABLE_ITEMS.includes(itemName);
+
+const getUnitForItem = (itemName: string): string => {
+  const units: Record<string, string> = {
+    수온: "°C",
+    DO: " ppm",
+    염분: " PSU",
+    pH: "",
+    "GPS 감도": "",
+    "배터리 전압": " V",
+  };
+  return units[itemName] || "";
+};
+
+const formatDateTime = (date: Date): string => {
+  return date.toISOString().slice(0, 16).replace("T", " ");
+};
+
+const getAlgorithmRange = (itemName: string, baseValue: number) => {
+  const ranges: Record<string, { min: number; max: number }> = {
+    수온: { min: baseValue - 5, max: baseValue + 5 },
+    DO: { min: baseValue - 2, max: baseValue + 2 },
+    염분: { min: baseValue - 3, max: baseValue + 3 },
+  };
+  return ranges[itemName] || { min: baseValue - 1, max: baseValue + 1 };
+};
+
+const generateAnomalyData = (equipment: Equipment): TimeSeriesData[] => {
+  const occurredTime = new Date(equipment.occurredAt);
+  const data: TimeSeriesData[] = [];
+  const range = getAlgorithmRange(
+    equipment.issueItem,
+    equipment.measurementValue
+  );
+
+  // 1시간 간격으로 24시간 데이터 생성 (±12시간)
+  for (let i = -12; i <= 12; i++) {
+    const time = new Date(occurredTime);
+    time.setHours(time.getHours() + i);
+
+    let value: number;
+
+    // 발생 시점 근처(-2 ~ +2시간)에는 범위를 벗어난 값 생성
+    if (i >= -2 && i <= 2) {
+      // 최소값 아래 또는 최대값 위로 벗어나게 함
+      const exceedDirection = Math.random() > 0.5 ? 1 : -1;
+      if (exceedDirection > 0) {
+        // 최대값을 초과
+        value = range.max + 1 + Math.random() * 2;
+      } else {
+        // 최소값 미만
+        value = range.min - 1 - Math.random() * 2;
+      }
+    } else {
+      // 정상 범위 내의 값
+      value = range.min + Math.random() * (range.max - range.min);
+    }
+
+    data.push({
+      time: formatDateTime(time),
+      value: value,
+    });
+  }
+
+  return data;
+};
+
+const generateRecentData = (): MultiSeriesData[] => {
+  const now = new Date();
+  const data: MultiSeriesData[] = [];
+
+  // 1시간 간격으로 24시간 데이터 생성 (정각 기준)
+  for (let i = 23; i >= 0; i--) {
+    const time = new Date(now);
+    time.setHours(time.getHours() - i);
+    time.setMinutes(0);
+    time.setSeconds(0);
+    time.setMilliseconds(0);
+
+    data.push({
+      time: formatDateTime(time),
+      waterTemp: 15 + Math.random() * 5, // 15-20°C
+      do: 6 + Math.random() * 2, // 6-8 ppm
+      salinity: 30 + Math.random() * 5, // 30-35 PSU
+    });
+  }
+
+  return data;
+};
+
 const mockEquipmentData: Equipment[] = [
   {
     id: "1",
@@ -59,7 +190,7 @@ const mockEquipmentData: Equipment[] = [
     confirmedAt: "2025-10-27 09:05",
     actionCompletedAt: "2025-10-28 14:20",
     issueDuration: "120일",
-    occurredAt: "2025-10-26 00:30",
+    occurredAt: "2025-10-26 00:00",
   },
   {
     id: "2",
@@ -72,7 +203,7 @@ const mockEquipmentData: Equipment[] = [
     confirmStatus: "미확인",
     confirmedAt: "-",
     issueDuration: "60일",
-    occurredAt: "2025-12-18 00:30",
+    occurredAt: "2025-12-18 01:00",
   },
   {
     id: "3",
@@ -85,7 +216,7 @@ const mockEquipmentData: Equipment[] = [
     confirmStatus: "미확인",
     confirmedAt: "-",
     issueDuration: "15일",
-    occurredAt: "2025-12-03 00:30",
+    occurredAt: "2025-12-03 03:00",
   },
   {
     id: "4",
@@ -119,7 +250,7 @@ const mockEquipmentData: Equipment[] = [
     projectName: "진흥원",
     equipmentSN: "MSB-M-250013",
     equipmentName: "정점 2",
-    issueItem: "pH",
+    issueItem: "염분",
     measurementValue: 8.5,
     unit: "",
     confirmStatus: "확인완료",
@@ -138,7 +269,7 @@ const mockEquipmentData: Equipment[] = [
     confirmStatus: "미확인",
     confirmedAt: "-",
     issueDuration: "1일",
-    occurredAt: "2025-12-18 15:30",
+    occurredAt: "2025-12-18 15:00",
   },
 ];
 
@@ -149,6 +280,16 @@ export default function EquipmentAnomalies() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [showCompleted, setShowCompleted] = useState(false);
 
+  // 팝업 상태
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(
+    null
+  );
+  const [anomalyChartData, setAnomalyChartData] = useState<TimeSeriesData[]>(
+    []
+  );
+  const [recentChartData, setRecentChartData] = useState<MultiSeriesData[]>([]);
+
   const handleSort = (field: keyof Equipment) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -156,6 +297,47 @@ export default function EquipmentAnomalies() {
       setSortField(field);
       setSortDirection("asc");
     }
+  };
+
+  const handleEquipmentClick = (equipment: Equipment) => {
+    setSelectedEquipment(equipment);
+
+    // 차트 데이터 생성
+    if (isChartableItem(equipment.issueItem)) {
+      setAnomalyChartData(generateAnomalyData(equipment));
+    }
+    setRecentChartData(generateRecentData());
+
+    setDialogOpen(true);
+  };
+
+  // 범위 밖 점 렌더링 함수
+  const renderAnomalyDot = (props: any) => {
+    const { cx, cy, payload } = props;
+    if (!selectedEquipment) return <Dot {...props} />;
+
+    const range = getAlgorithmRange(
+      selectedEquipment.issueItem,
+      selectedEquipment.measurementValue
+    );
+
+    // 범위를 벗어난 점인지 확인
+    const isOutOfRange = payload.value < range.min || payload.value > range.max;
+
+    if (isOutOfRange) {
+      return (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={6}
+          fill="#ef4444"
+          stroke="#fff"
+          strokeWidth={2}
+        />
+      );
+    }
+
+    return <Dot {...props} r={3} fill="#2563eb" />;
   };
 
   const filteredAndSortedData = equipmentData
@@ -377,7 +559,12 @@ export default function EquipmentAnomalies() {
                           {item.projectName}
                         </TableCell>
                         <TableCell className="text-center">
-                          {item.equipmentSN}
+                          <span
+                            className="underline cursor-pointer hover:text-blue-600"
+                            onClick={() => handleEquipmentClick(item)}
+                          >
+                            {item.equipmentSN}
+                          </span>
                         </TableCell>
                         <TableCell className="text-center">
                           {item.equipmentName}
@@ -406,19 +593,21 @@ export default function EquipmentAnomalies() {
                         <TableCell className="text-center">
                           {item.confirmStatus === "미확인" ? (
                             <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => console.log("확인 완료:", item.id)}
-                              className="bg-blue-500 hover:bg-blue-600 text-white w-24"
+                              className="border-gray-300 text-blue-600 hover:bg-gray-100 text-xs w-28"
                             >
-                              확인 완료
+                              확인 완료 처리
                             </Button>
                           ) : item.confirmStatus === "확인완료" ? (
                             <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => console.log("조치 완료:", item.id)}
-                              className="bg-green-500 hover:bg-green-600 text-white w-24"
+                              className="border-gray-300 text-green-600 hover:bg-gray-100 text-xs w-28"
                             >
-                              조치 완료
+                              조치 완료 처리
                             </Button>
                           ) : (
                             "-"
@@ -429,7 +618,7 @@ export default function EquipmentAnomalies() {
                             variant="outline"
                             size="sm"
                             onClick={() => console.log("새창 열기:", item.id)}
-                            className="text-red-500 border-red-300 hover:bg-red-50"
+                            className="border-gray-300 text-red-500 hover:bg-gray-100 text-xs"
                           >
                             열기
                           </Button>
@@ -489,6 +678,185 @@ export default function EquipmentAnomalies() {
           </div>
         </div>
       </main>
+
+      {/* 장비 상세 팝업 */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              장비 상세 - {selectedEquipment?.equipmentSN}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedEquipment?.projectName} |{" "}
+              {selectedEquipment?.equipmentName}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* 상단 차트 - 차트 표시 가능 항목만 */}
+            {selectedEquipment &&
+            isChartableItem(selectedEquipment.issueItem) ? (
+              <div>
+                {/* 캡션 */}
+                <div className="text-sm text-gray-600 mb-2">
+                  {selectedEquipment.occurredAt} | {selectedEquipment.issueItem}{" "}
+                  이상 | 측정값: {selectedEquipment.measurementValue}
+                  {getUnitForItem(selectedEquipment.issueItem)}
+                </div>
+
+                {/* 차트 */}
+                <div className="h-[300px]">
+                  <ChartContainer
+                    config={{
+                      value: {
+                        label: selectedEquipment.issueItem,
+                        color: "#2563eb",
+                      },
+                    }}
+                  >
+                    <LineChart data={anomalyChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="time" />
+                      <YAxis
+                        domain={[
+                          getAlgorithmRange(
+                            selectedEquipment.issueItem,
+                            selectedEquipment.measurementValue
+                          ).min - 2,
+                          getAlgorithmRange(
+                            selectedEquipment.issueItem,
+                            selectedEquipment.measurementValue
+                          ).max + 2,
+                        ]}
+                      />
+
+                      {/* 정상 범위 배경색 (최소~최대) */}
+                      <ReferenceArea
+                        y1={
+                          getAlgorithmRange(
+                            selectedEquipment.issueItem,
+                            selectedEquipment.measurementValue
+                          ).min
+                        }
+                        y2={
+                          getAlgorithmRange(
+                            selectedEquipment.issueItem,
+                            selectedEquipment.measurementValue
+                          ).max
+                        }
+                        fill="#22c55e"
+                        fillOpacity={0.1}
+                        stroke="none"
+                      />
+
+                      {/* 알고리즘 최소선 */}
+                      <ReferenceLine
+                        y={
+                          getAlgorithmRange(
+                            selectedEquipment.issueItem,
+                            selectedEquipment.measurementValue
+                          ).min
+                        }
+                        stroke="#dc2626"
+                        strokeDasharray="3 3"
+                        label="최소"
+                      />
+
+                      {/* 알고리즘 최대선 */}
+                      <ReferenceLine
+                        y={
+                          getAlgorithmRange(
+                            selectedEquipment.issueItem,
+                            selectedEquipment.measurementValue
+                          ).max
+                        }
+                        stroke="#dc2626"
+                        strokeDasharray="3 3"
+                        label="최대"
+                      />
+
+                      {/* 실측선 */}
+                      <Line
+                        type="monotone"
+                        dataKey="value"
+                        stroke="#2563eb"
+                        strokeWidth={2}
+                        dot={renderAnomalyDot}
+                      />
+
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                    </LineChart>
+                  </ChartContainer>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-600">
+                {selectedEquipment?.issueItem} 항목은 차트를 지원하지 않습니다.
+              </div>
+            )}
+
+            {/* 하단 차트 - 항상 표시 */}
+            <div>
+              <h3 className="text-sm font-medium mb-2">
+                최근 24시간 측정 추이
+              </h3>
+              <div className="h-[300px]">
+                <ChartContainer
+                  config={{
+                    waterTemp: {
+                      label: "수온",
+                      color: "#2563eb",
+                    },
+                    do: {
+                      label: "DO",
+                      color: "#16a34a",
+                    },
+                    salinity: {
+                      label: "염분",
+                      color: "#9333ea",
+                    },
+                  }}
+                >
+                  <LineChart data={recentChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis />
+
+                    {/* 3개의 측정 항목 */}
+                    <Line
+                      type="monotone"
+                      dataKey="waterTemp"
+                      stroke="#2563eb"
+                      name="수온"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="do"
+                      stroke="#16a34a"
+                      name="DO"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="salinity"
+                      stroke="#9333ea"
+                      name="염분"
+                    />
+
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                  </LineChart>
+                </ChartContainer>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              닫기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

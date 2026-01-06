@@ -534,7 +534,6 @@ export default function EquipmentAnomalies() {
                         } ${highlightClass}`}
                       >
                         {point.value}
-                        {getUnitForItem(equipment.issueItem)}
                       </TableCell>
                     </>
                   );
@@ -898,7 +897,7 @@ export default function EquipmentAnomalies() {
         </div>
       </main>
 
-      {/* 장비 상세 팝업 */}
+      {/* 이상 장비 상세 팝업 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
           className={
@@ -909,7 +908,7 @@ export default function EquipmentAnomalies() {
         >
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>
-              장비 상세 / {selectedEquipment?.equipmentSN}
+              이상 장비 상세 / {selectedEquipment?.equipmentSN}
             </DialogTitle>
             <DialogDescription>
               {selectedEquipment?.projectName} |{" "}
@@ -1018,7 +1017,7 @@ export default function EquipmentAnomalies() {
                         margin={{ top: 8, right: 8, left: 0, bottom: 8 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="index" type="number" hide />
+                        <XAxis dataKey="index" type="number" tick={false} />
                         <YAxis
                           dataKey="value"
                           type="number"
@@ -1028,27 +1027,40 @@ export default function EquipmentAnomalies() {
                           )}
                           tickFormatter={(v) => Math.round(v).toString()}
                         />
-                        <ReferenceArea
-                          y1={
-                            getAlgorithmRange(selectedEquipment.issueItem).min
+                        {/* 정상 값 평균 라인 */}
+                        {(() => {
+                          const range = getAlgorithmRange(
+                            selectedEquipment.issueItem
+                          );
+                          const normalValues = scatterChartData.filter(
+                            (point) =>
+                              point.value >= range.min &&
+                              point.value <= range.max
+                          );
+                          if (normalValues.length > 0) {
+                            const averageValue =
+                              normalValues.reduce(
+                                (sum, point) => sum + point.value,
+                                0
+                              ) / normalValues.length;
+                            return (
+                              <ReferenceLine
+                                y={averageValue}
+                                stroke="#6b7280"
+                                strokeDasharray="5 5"
+                                strokeWidth={2}
+                                label={{
+                                  value: "평균",
+                                  position: "insideTopLeft",
+                                  offset: 10,
+                                  fill: "#6b7280",
+                                  fontSize: 12,
+                                }}
+                              />
+                            );
                           }
-                          y2={
-                            getAlgorithmRange(selectedEquipment.issueItem).max
-                          }
-                          fill="#22c55e"
-                          fillOpacity={0.1}
-                          stroke="none"
-                        />
-                        <ReferenceLine
-                          y={getAlgorithmRange(selectedEquipment.issueItem).min}
-                          stroke="#dc2626"
-                          strokeDasharray="3 3"
-                        />
-                        <ReferenceLine
-                          y={getAlgorithmRange(selectedEquipment.issueItem).max}
-                          stroke="#dc2626"
-                          strokeDasharray="3 3"
-                        />
+                          return null;
+                        })()}
                         <Scatter
                           data={scatterChartData}
                           dataKey="value"

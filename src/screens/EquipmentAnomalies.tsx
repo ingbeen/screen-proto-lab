@@ -102,7 +102,9 @@ const getUnitForItem = (itemName: string): string => {
 };
 
 const formatDateTime = (date: Date): string => {
-  return date.toISOString().slice(0, 16).replace("T", " ");
+  // KST 변환 (UTC + 9시간)
+  const kstDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return kstDate.toISOString().slice(0, 16).replace("T", " ");
 };
 
 const getAlgorithmRange = (itemName: string) => {
@@ -133,13 +135,12 @@ const generateAnomalyData = (equipment: Equipment): TimeSeriesData[] => {
 
     let value: number;
 
-    // 발생 시점 근처(-1 ~ +1시간)에는 범위를 벗어난 값 생성 (3개 포인트)
-    const isAnomalyPeriod = i >= -1 && i <= 1;
-
-    // 3개 포인트 중 약 2개만 이상치로 표시 (66% 확률)
-    const shouldBeAnomalous = isAnomalyPeriod && Math.random() > 0.33;
-
-    if (shouldBeAnomalous) {
+    // i = 0: 발생 시점 - 정확히 measurementValue 사용 (첫 번째 이상치)
+    if (i === 0) {
+      value = measurementValue;
+    }
+    // i = 1 또는 2: 추가 이상치 1~2개 생성 (50% 확률)
+    else if (i > 0 && i <= 2 && Math.random() > 0.5) {
       if (isAboveMax) {
         // 최대값 위로만 벗어남
         value = range.max + 1 + Math.random() * 2;
@@ -150,14 +151,15 @@ const generateAnomalyData = (equipment: Equipment): TimeSeriesData[] => {
         // measurementValue가 정상 범위 내인 경우 (일반적이지 않음)
         value = range.min + Math.random() * (range.max - range.min);
       }
-    } else {
-      // 정상 범위 내의 값
+    }
+    // 나머지: 정상 범위 내의 값
+    else {
       value = range.min + Math.random() * (range.max - range.min);
     }
 
     data.push({
       time: formatDateTime(time),
-      value: value,
+      value: Number(value.toFixed(2)), // 소수점 2자리로 제한
     });
   }
 
@@ -178,9 +180,9 @@ const generateRecentData = (): MultiSeriesData[] => {
 
     data.push({
       time: formatDateTime(time),
-      waterTemp: 15 + Math.random() * 5, // 15-20°C
-      do: 6 + Math.random() * 2, // 6-8 ppm
-      salinity: 30 + Math.random() * 5, // 30-35 PSU
+      waterTemp: Number((15 + Math.random() * 5).toFixed(2)), // 15-20°C
+      do: Number((6 + Math.random() * 2).toFixed(2)), // 6-8 ppm
+      salinity: Number((30 + Math.random() * 5).toFixed(2)), // 30-35 PSU
     });
   }
 
@@ -713,7 +715,7 @@ export default function EquipmentAnomalies() {
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              장비 상세 - {selectedEquipment?.equipmentSN}
+              장비 상세 / {selectedEquipment?.equipmentSN}
             </DialogTitle>
             <DialogDescription>
               {selectedEquipment?.projectName} |{" "}
@@ -751,6 +753,7 @@ export default function EquipmentAnomalies() {
                           selectedEquipment.issueItem,
                           selectedEquipment.measurementValue
                         )}
+                        tickFormatter={(value) => Math.round(value).toString()}
                       />
 
                       {/* 정상 범위 배경색 (최소~최대) */}

@@ -55,6 +55,8 @@ import {
   ReferenceLine,
   ReferenceArea,
   Dot,
+  ScatterChart,
+  Scatter,
 } from "recharts";
 
 export interface Equipment {
@@ -82,6 +84,14 @@ interface MultiSeriesData {
   waterTemp: number;
   do: number;
   salinity: number;
+}
+
+interface ScatterDataPoint {
+  index: number;
+  value: number;
+  equipmentSN: string;
+  equipmentName: string;
+  isSelected: boolean;
 }
 
 // 유틸리티 함수들
@@ -128,8 +138,8 @@ const generateAnomalyData = (equipment: Equipment): TimeSeriesData[] => {
   const isAboveMax = measurementValue > range.max;
   const isBelowMin = measurementValue < range.min;
 
-  // 1시간 간격으로 24시간 데이터 생성 (±12시간)
-  for (let i = -12; i <= 12; i++) {
+  // 1시간 간격으로 24시간 데이터 생성 (과거 11시간 + 미래 12시간)
+  for (let i = -11; i <= 12; i++) {
     const time = new Date(occurredTime);
     time.setHours(time.getHours() + i);
 
@@ -183,6 +193,52 @@ const generateRecentData = (): MultiSeriesData[] => {
       waterTemp: Number((15 + Math.random() * 5).toFixed(2)), // 15-20°C
       do: Number((6 + Math.random() * 2).toFixed(2)), // 6-8 ppm
       salinity: Number((30 + Math.random() * 5).toFixed(2)), // 30-35 PSU
+    });
+  }
+
+  return data;
+};
+
+const generateScatterData = (equipment: Equipment): ScatterDataPoint[] => {
+  const data: ScatterDataPoint[] = [];
+  const range = getAlgorithmRange(equipment.issueItem);
+  const { measurementValue, equipmentSN, equipmentName } = equipment;
+
+  // 약 20개의 점 생성
+  const totalPoints = 20;
+
+  // 가상의 장비 이름들
+  const mockEquipmentNames = [
+    "신안 하의 옥도",
+    "완도 신지",
+    "해양수산",
+    "정점 1",
+    "정점 2",
+    "정점 3",
+    "정점 4",
+    "정점 5",
+  ];
+
+  for (let i = 0; i < totalPoints; i++) {
+    const isSelectedEquipment = i === 0; // 첫 번째 점을 선택 장비로 설정
+
+    let value: number;
+    if (isSelectedEquipment) {
+      // 선택된 장비만 실제 측정값 사용 (이상치)
+      value = measurementValue;
+    } else {
+      // 나머지 장비들은 모두 정상 범위 내의 값만 사용
+      value = range.min + Math.random() * (range.max - range.min);
+    }
+
+    data.push({
+      index: i + 1,
+      value: Number(value.toFixed(2)),
+      equipmentSN: isSelectedEquipment ? equipmentSN : `MSB-M-2500${10 + i}`,
+      equipmentName: isSelectedEquipment
+        ? equipmentName
+        : mockEquipmentNames[i % mockEquipmentNames.length],
+      isSelected: isSelectedEquipment,
     });
   }
 
@@ -339,11 +395,20 @@ export default function EquipmentAnomalies() {
     // 차트 데이터 생성
     if (isChartableItem(equipment.issueItem)) {
       setAnomalyChartData(generateAnomalyData(equipment));
+      setScatterChartData(generateScatterData(equipment));
+      setRecentChartData(generateRecentData());
+    } else {
+      // 미지원 항목은 anomaly 차트만 생성
+      setAnomalyChartData(generateAnomalyData(equipment));
     }
-    setRecentChartData(generateRecentData());
 
     setDialogOpen(true);
   };
+
+  // Scatter 차트 상태
+  const [scatterChartData, setScatterChartData] = useState<ScatterDataPoint[]>(
+    []
+  );
 
   // 범위 밖 점 렌더링 함수
   const renderAnomalyDot = (props: any) => {
@@ -369,6 +434,129 @@ export default function EquipmentAnomalies() {
     }
 
     return <Dot {...props} r={3} fill="#2563eb" />;
+  };
+
+  // Scatter 점 렌더링 함수
+  const renderScatterDot = (props: any) => {
+    const { cx, cy, payload } = props;
+
+    if (payload.isSelected) {
+      // 선택된 장비는 크게 강조
+      return (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={8}
+          fill="#ef4444"
+          stroke="#fff"
+          strokeWidth={3}
+        />
+      );
+    }
+
+    return <circle cx={cx} cy={cy} r={4} fill="#2563eb" fillOpacity={0.6} />;
+  };
+
+  // 테이블 데이터 컴포넌트
+  const AnomalyDataTable = ({
+    data,
+    equipment,
+  }: {
+    data: TimeSeriesData[];
+    equipment: Equipment;
+  }) => {
+    const range = getAlgorithmRange(equipment.issueItem);
+
+    // 데이터를 세로 방향으로 채우기 위한 재배치
+    const columns = 3; // 3개 컬럼
+    const rowsCount = Math.ceil(data.length / columns);
+    const rows: TimeSeriesData[][] = [];
+
+    // 각 행을 생성 (세로 방향으로 데이터 채우기)
+    for (let rowIndex = 0; rowIndex < rowsCount; rowIndex++) {
+      const row: TimeSeriesData[] = [];
+      for (let colIndex = 0; colIndex < columns; colIndex++) {
+        const dataIndex = colIndex * rowsCount + rowIndex;
+        if (dataIndex < data.length) {
+          row.push(data[dataIndex]);
+        }
+      }
+      rows.push(row);
+    }
+
+    return (
+      <div className="border rounded-lg overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-gray-50">
+              <TableHead className="text-center border-r border-gray-200">
+                시간
+              </TableHead>
+              <TableHead className="text-center border-r-2 border-gray-300">
+                값
+              </TableHead>
+              <TableHead className="text-center border-r border-gray-200">
+                시간
+              </TableHead>
+              <TableHead className="text-center border-r-2 border-gray-300">
+                값
+              </TableHead>
+              <TableHead className="text-center border-r border-gray-200">
+                시간
+              </TableHead>
+              <TableHead className="text-center">값</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row, rowIndex) => (
+              <TableRow key={rowIndex}>
+                {row.map((point, pairIndex) => {
+                  const isOutOfRange =
+                    point.value < range.min || point.value > range.max;
+
+                  // 정상 범위 밖이면 빨간색 배경으로 강조
+                  const highlightClass = isOutOfRange
+                    ? "bg-red-50 font-semibold text-red-700"
+                    : "";
+
+                  return (
+                    <>
+                      <TableCell
+                        key={`time-${pairIndex}`}
+                        className={`text-center text-xs border-r border-gray-200 ${highlightClass}`}
+                      >
+                        {point.time}
+                      </TableCell>
+                      <TableCell
+                        key={`value-${pairIndex}`}
+                        className={`text-center text-xs ${
+                          pairIndex < 2 ? "border-r-2 border-gray-300" : ""
+                        } ${highlightClass}`}
+                      >
+                        {point.value}
+                        {getUnitForItem(equipment.issueItem)}
+                      </TableCell>
+                    </>
+                  );
+                })}
+                {/* 빈 셀 채우기 (행에 3개 미만인 경우) */}
+                {row.length < columns &&
+                  Array.from({ length: (columns - row.length) * 2 }).map(
+                    (_, i) => (
+                      <TableCell
+                        key={`empty-${i}`}
+                        className={`bg-white ${
+                          i % 2 === 0 ? "border-r border-gray-200" : ""
+                        }`}
+                      />
+                    )
+                  )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
   };
 
   const filteredAndSortedData = equipmentData
@@ -712,8 +900,14 @@ export default function EquipmentAnomalies() {
 
       {/* 장비 상세 팝업 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent
+          className={
+            selectedEquipment && isChartableItem(selectedEquipment.issueItem)
+              ? "!max-w-[1400px] h-[95vh] max-h-[1000px] flex flex-col overflow-hidden"
+              : "max-w-2xl max-h-[60vh]"
+          }
+        >
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>
               장비 상세 / {selectedEquipment?.equipmentSN}
             </DialogTitle>
@@ -723,71 +917,275 @@ export default function EquipmentAnomalies() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            {/* 상단 차트 - 차트 표시 가능 항목만 */}
+          <div className="flex-1 py-4 min-h-0">
             {selectedEquipment &&
             isChartableItem(selectedEquipment.issueItem) ? (
-              <div>
-                {/* 캡션 */}
-                <div className="text-sm text-gray-600 mb-2">
-                  {selectedEquipment.occurredAt} | {selectedEquipment.issueItem}{" "}
-                  이상 | 측정값: {selectedEquipment.measurementValue}
-                  {getUnitForItem(selectedEquipment.issueItem)}
+              // 지원 항목: 2x2 레이아웃 (각 영역 25%)
+              <div className="grid grid-cols-2 grid-rows-2 gap-8 h-full w-full min-h-0 overflow-hidden">
+                {/* [1] 좌상: 이상 시점 전후 추이 차트 */}
+                <div className="min-h-0 flex flex-col border-r-2 border-gray-300 pr-8 overflow-hidden">
+                  <h3 className="text-sm font-medium mb-2">
+                    이상 시점 전후 추이
+                  </h3>
+                  <div className="text-sm text-gray-600 mb-2">
+                    {selectedEquipment.occurredAt} |{" "}
+                    {selectedEquipment.issueItem} 이상 | 측정값:{" "}
+                    {selectedEquipment.measurementValue}
+                    {getUnitForItem(selectedEquipment.issueItem)}
+                  </div>
+
+                  {/* 차트가 아래 영역을 침범하지 않도록 min-h-0 + overflow-hidden */}
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <ChartContainer
+                      config={{
+                        value: {
+                          label: selectedEquipment.issueItem,
+                          color: "#2563eb",
+                        },
+                      }}
+                    >
+                      <LineChart
+                        data={anomalyChartData}
+                        margin={{ top: 8, right: 8, left: 0, bottom: 28 }} // ✅ 라벨 공간 확보
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="time"
+                          tick={{ fontSize: 10 }}
+                          height={70} // ✅ 회전 라벨 높이 여유
+                          tickMargin={8}
+                          angle={-45}
+                          textAnchor="end"
+                        />
+                        <YAxis
+                          domain={calculateYAxisDomain(
+                            selectedEquipment.issueItem,
+                            selectedEquipment.measurementValue
+                          )}
+                          tickFormatter={(v) => Math.round(v).toString()}
+                        />
+                        <ReferenceArea
+                          y1={
+                            getAlgorithmRange(selectedEquipment.issueItem).min
+                          }
+                          y2={
+                            getAlgorithmRange(selectedEquipment.issueItem).max
+                          }
+                          fill="#22c55e"
+                          fillOpacity={0.1}
+                          stroke="none"
+                        />
+                        <ReferenceLine
+                          y={getAlgorithmRange(selectedEquipment.issueItem).min}
+                          stroke="#dc2626"
+                          strokeDasharray="3 3"
+                          label="최소"
+                        />
+                        <ReferenceLine
+                          y={getAlgorithmRange(selectedEquipment.issueItem).max}
+                          stroke="#dc2626"
+                          strokeDasharray="3 3"
+                          label="최대"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="value"
+                          stroke="#2563eb"
+                          strokeWidth={2}
+                          dot={renderAnomalyDot}
+                        />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                      </LineChart>
+                    </ChartContainer>
+                  </div>
                 </div>
 
-                {/* 차트 */}
+                {/* [2] 우상: 동시각 비교 Scatter */}
+                <div className="min-h-0 flex flex-col pl-2 overflow-hidden">
+                  <h3 className="text-sm font-medium mb-2">
+                    동시각 비교 ({selectedEquipment.occurredAt})
+                  </h3>
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <ChartContainer
+                      config={{
+                        value: {
+                          label: selectedEquipment.issueItem,
+                          color: "#2563eb",
+                        },
+                      }}
+                    >
+                      <ScatterChart
+                        margin={{ top: 8, right: 8, left: 0, bottom: 8 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="index" type="number" hide />
+                        <YAxis
+                          dataKey="value"
+                          type="number"
+                          domain={calculateYAxisDomain(
+                            selectedEquipment.issueItem,
+                            selectedEquipment.measurementValue
+                          )}
+                          tickFormatter={(v) => Math.round(v).toString()}
+                        />
+                        <ReferenceArea
+                          y1={
+                            getAlgorithmRange(selectedEquipment.issueItem).min
+                          }
+                          y2={
+                            getAlgorithmRange(selectedEquipment.issueItem).max
+                          }
+                          fill="#22c55e"
+                          fillOpacity={0.1}
+                          stroke="none"
+                        />
+                        <ReferenceLine
+                          y={getAlgorithmRange(selectedEquipment.issueItem).min}
+                          stroke="#dc2626"
+                          strokeDasharray="3 3"
+                        />
+                        <ReferenceLine
+                          y={getAlgorithmRange(selectedEquipment.issueItem).max}
+                          stroke="#dc2626"
+                          strokeDasharray="3 3"
+                        />
+                        <Scatter
+                          data={scatterChartData}
+                          dataKey="value"
+                          shape={renderScatterDot}
+                        />
+                        <ChartTooltip
+                          content={({ payload }) => {
+                            if (!payload || payload.length === 0) return null;
+                            const data = payload[0].payload as ScatterDataPoint;
+                            return (
+                              <div className="bg-white p-3 border rounded shadow-lg">
+                                <div className="text-sm font-semibold">
+                                  {data.equipmentSN}
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                  {data.equipmentName}
+                                </div>
+                                <div className="text-sm font-medium mt-1">
+                                  값: {data.value}
+                                  {getUnitForItem(selectedEquipment.issueItem)}
+                                </div>
+                              </div>
+                            );
+                          }}
+                        />
+                      </ScatterChart>
+                    </ChartContainer>
+                  </div>
+                </div>
+
+                {/* [3] 좌하: 이상 시점 전후 추이 데이터 테이블 */}
+                <div className="min-h-0 flex flex-col border-r-2 border-gray-300 pr-8 overflow-hidden">
+                  <h3 className="text-sm font-medium mb-2">
+                    이상 시점 전후 추이 데이터
+                  </h3>
+                  <div className="flex-1 min-h-0 overflow-y-auto">
+                    <AnomalyDataTable
+                      data={anomalyChartData}
+                      equipment={selectedEquipment}
+                    />
+                  </div>
+                </div>
+
+                {/* [4] 우하: 최근 24시간 측정 추이 */}
+                <div className="min-h-0 flex flex-col pl-2 overflow-hidden">
+                  <h3 className="text-sm font-medium mb-2">
+                    최근 24시간 측정 추이
+                  </h3>
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <ChartContainer
+                      config={{
+                        waterTemp: { label: "수온", color: "#2563eb" },
+                        do: { label: "DO", color: "#16a34a" },
+                        salinity: { label: "염분", color: "#9333ea" },
+                      }}
+                    >
+                      <LineChart
+                        data={recentChartData}
+                        margin={{ top: 8, right: 8, left: 0, bottom: 28 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="time"
+                          tick={{ fontSize: 10 }}
+                          height={70}
+                          tickMargin={8}
+                          angle={-45}
+                          textAnchor="end"
+                        />
+                        <YAxis />
+                        <Line
+                          type="monotone"
+                          dataKey="waterTemp"
+                          stroke="#2563eb"
+                          name="수온"
+                          strokeWidth={2}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="do"
+                          stroke="#16a34a"
+                          name="DO"
+                          strokeWidth={2}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="salinity"
+                          stroke="#9333ea"
+                          name="염분"
+                          strokeWidth={2}
+                        />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <ChartLegend content={<ChartLegendContent />} />
+                      </LineChart>
+                    </ChartContainer>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // 미지원 항목: 단일 차트만 표시
+              <div>
+                <h3 className="text-sm font-medium mb-2">
+                  이상 시점 전후 추이
+                </h3>
+                <div className="text-sm text-gray-600 mb-2">
+                  {selectedEquipment?.occurredAt} |{" "}
+                  {selectedEquipment?.issueItem} 이상 | 측정값:{" "}
+                  {selectedEquipment?.measurementValue}
+                  {selectedEquipment &&
+                    getUnitForItem(selectedEquipment.issueItem)}
+                </div>
                 <div className="h-[300px]">
                   <ChartContainer
                     config={{
                       value: {
-                        label: selectedEquipment.issueItem,
+                        label: selectedEquipment?.issueItem || "",
                         color: "#2563eb",
                       },
                     }}
                   >
                     <LineChart data={anomalyChartData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="time" />
-                      <YAxis
-                        domain={calculateYAxisDomain(
-                          selectedEquipment.issueItem,
-                          selectedEquipment.measurementValue
-                        )}
-                        tickFormatter={(value) => Math.round(value).toString()}
+                      <XAxis
+                        dataKey="time"
+                        tick={{ fontSize: 10 }}
+                        height={60}
+                        angle={-45}
+                        textAnchor="end"
                       />
+                      <YAxis />
 
-                      {/* 정상 범위 배경색 (최소~최대) */}
-                      <ReferenceArea
-                        y1={getAlgorithmRange(selectedEquipment.issueItem).min}
-                        y2={getAlgorithmRange(selectedEquipment.issueItem).max}
-                        fill="#22c55e"
-                        fillOpacity={0.1}
-                        stroke="none"
-                      />
-
-                      {/* 알고리즘 최소선 */}
-                      <ReferenceLine
-                        y={getAlgorithmRange(selectedEquipment.issueItem).min}
-                        stroke="#dc2626"
-                        strokeDasharray="3 3"
-                        label="최소"
-                      />
-
-                      {/* 알고리즘 최대선 */}
-                      <ReferenceLine
-                        y={getAlgorithmRange(selectedEquipment.issueItem).max}
-                        stroke="#dc2626"
-                        strokeDasharray="3 3"
-                        label="최대"
-                      />
-
-                      {/* 실측선 */}
                       <Line
                         type="monotone"
                         dataKey="value"
                         stroke="#2563eb"
                         strokeWidth={2}
-                        dot={renderAnomalyDot}
+                        dot={{ r: 3 }}
                       />
 
                       <ChartTooltip content={<ChartTooltipContent />} />
@@ -795,68 +1193,10 @@ export default function EquipmentAnomalies() {
                   </ChartContainer>
                 </div>
               </div>
-            ) : (
-              <div className="text-sm text-gray-600">
-                {selectedEquipment?.issueItem} 항목은 차트를 지원하지 않습니다.
-              </div>
             )}
-
-            {/* 하단 차트 - 항상 표시 */}
-            <div>
-              <h3 className="text-sm font-medium mb-2">
-                최근 24시간 측정 추이
-              </h3>
-              <div className="h-[300px]">
-                <ChartContainer
-                  config={{
-                    waterTemp: {
-                      label: "수온",
-                      color: "#2563eb",
-                    },
-                    do: {
-                      label: "DO",
-                      color: "#16a34a",
-                    },
-                    salinity: {
-                      label: "염분",
-                      color: "#9333ea",
-                    },
-                  }}
-                >
-                  <LineChart data={recentChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="time" />
-                    <YAxis />
-
-                    {/* 3개의 측정 항목 */}
-                    <Line
-                      type="monotone"
-                      dataKey="waterTemp"
-                      stroke="#2563eb"
-                      name="수온"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="do"
-                      stroke="#16a34a"
-                      name="DO"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="salinity"
-                      stroke="#9333ea"
-                      name="염분"
-                    />
-
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <ChartLegend content={<ChartLegendContent />} />
-                  </LineChart>
-                </ChartContainer>
-              </div>
-            </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               닫기
             </Button>
